@@ -1,0 +1,21 @@
+# Disposable database for backend tests. Separate project name, port, database
+# name, and tmpfs storage, so tests can never touch the development database.
+# Usage: make test-db   (TEST_DATABASE_URL is set by `make test`)
+name: cloudops-ai-test
+
+services:
+  db-test:
+    image: pgvector/pgvector:0.8.1-pg17
+    environment:
+      POSTGRES_USER: cloudops
+      POSTGRES_PASSWORD: cloudops  # local-only test credential
+      POSTGRES_DB: cloudops_test
+    ports:
+      - "127.0.0.1:${TEST_DB_HOST_PORT:-55432}:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudops -d cloudops_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 30

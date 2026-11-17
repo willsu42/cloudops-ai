@@ -12,6 +12,37 @@
 | Primary stack | React, FastAPI, LangGraph, PostgreSQL/pgvector, Amazon Bedrock, ECS Fargate |
 | Document updated | November 16, 2026 |
 
+> [!IMPORTANT]
+> **Revision, 2026-11-17: OpenTelemetry Demo direction.** This revision overrides
+> conflicting parts of the original plan below.
+>
+> - **Reference system.** The project now uses the
+>   [OpenTelemetry Demo](https://opentelemetry.io/docs/demo/) instead of the
+>   fictional five-service organization (`api-gateway`, `user-service`, …) in
+>   Sections 1, 2, and 8. The first focus is the demo's **checkout flow**.
+>   Checkout's direct dependencies were verified in source (`src/checkout/main.go`):
+>   cart, currency, email, payment, product-catalog, and shipping, plus an optional
+>   Kafka producer. Shipping calls quote. Later weeks investigate checkout failures.
+> - **Knowledge corpus.** Nine official demo documentation pages (architecture,
+>   Docker deployment, and checkout-path services), copied unmodified under
+>   CC BY 4.0 with recorded provenance. See `datasets/corpus/README.md`. The
+>   synthetic runbooks and fixtures planned for Week 1 are not created.
+> - **Week 1 scope.** Week 1 now delivers the local application foundation and
+>   the document corpus only: no RAG inference, investigation workflow, job
+>   queue, worker process, provider mocks, or cloud deployment. See the
+>   revised Week 1 entry in Section 7.
+> - **Evaluation.** The fixed 40-case design in Section 8 is replaced by
+>   real-labeled cases that grow with the corpus. Week 1 contains a few
+>   development cases. The held-out set must be designed and frozen before
+>   retrieval or prompt tuning (Week 3). Incident families and fixtures for
+>   checkout failures will be defined from the demo's own behavior, and fault
+>   scenarios and expected root causes stay outside the retrieval corpus.
+> - **Repository.** The repository is `cloudops-ai`. Its layout grows only as
+>   features are implemented. The tree in Section 5 is the target, not the
+>   current state.
+> - **License.** The project license is undecided. No license file is added
+>   until the owner chooses one.
+
 This plan preserves the architecture and scope of the original project discussion and expands the milestones, acceptance criteria, and engineering details into an executable roadmap. All quality thresholds and spending limits below are proposed project targets, not achieved results or AWS price guarantees. Repository paths describe files to build; this document does not imply that those files already exist.
 
 ## Contents

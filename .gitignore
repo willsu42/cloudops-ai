@@ -218,3 +218,39 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---- CloudOps AI additions ----
+# The stock Python rule "lib/" above would also hide directories such as
+# apps/frontend/src/lib/. Re-include lib directories under apps/.
+!apps/**/lib/
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Frontend
+node_modules/
+apps/frontend/dist/
+*.tsbuildinfo
+.vite/
+.pnpm-store/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Evaluation raw outputs (commit only sanitized summaries)
+evaluations/results/raw/
+
+# Database dumps
+*.dump
+*.sql.gz
+*.pgdump
+
+# Editors / OS
+.DS_Store
+.idea/

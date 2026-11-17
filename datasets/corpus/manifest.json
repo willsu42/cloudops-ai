@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "corpus": "otel-demo",
+  "retrieved_on": "2026-11-17",
+  "documentation_source": {
+    "repository": "https://github.com/open-telemetry/opentelemetry.io",
+    "commit": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
+    "commit_date": "2026-11-17T09:56:59Z",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution": "© OpenTelemetry Authors. Documentation from opentelemetry.io, licensed under CC BY 4.0."
+  },
+  "application_reference": {
+    "repository": "https://github.com/open-telemetry/opentelemetry-demo",
+    "main_commit_at_retrieval": "b825c7c257268081dcfeff52d0f053fce1ef2561",
+    "latest_release_at_retrieval": "3.1.0",
+    "license": "Apache-2.0",
+    "note": "The documentation is not versioned per demo release; its service pages link to the demo repository's main branch. Treat the docs revision and the application version as separate facts."
+  },
+  "services": [
+    {
+      "slug": "frontend",
+      "name": "Frontend",
+      "language": "TypeScript",
+      "role": "Web UI; calls checkout to place orders"
+    },
+    {
+      "slug": "checkout",
+      "name": "Checkout",
+      "language": "Go",
+      "role": "Orchestrates order placement"
+    },
+    {
+      "slug": "cart",
+      "name": "Cart",
+      "language": ".NET",
+      "role": "Shopping cart, backed by a Valkey cache"
+    },
+    {
+      "slug": "currency",
+      "name": "Currency",
+      "language": "C++",
+      "role": "Currency conversion"
+    },
+    {
+      "slug": "payment",
+      "name": "Payment",
+      "language": "JavaScript",
+      "role": "Charges the credit card"
+    },
+    {
+      "slug": "shipping",
+      "name": "Shipping",
+      "language": "Rust",
+      "role": "Shipping quotes and order shipment; calls quote"
+    },
+    {
+      "slug": "quote",
+      "name": "Quote",
+      "language": "PHP",
+      "role": "Shipping cost calculation"
+    },
+    {
+      "slug": "email",
+      "name": "Email",
+      "language": "Ruby",
+      "role": "Order confirmation email"
+    },
+    {
+      "slug": "product-catalog",
+      "name": "Product Catalog",
+      "language": "Go",
+      "role": "Product data, backed by PostgreSQL"
+    },
+    {
+      "slug": "kafka",
+      "name": "Kafka",
+      "language": "Java",
+      "role": "Queue receiving placed orders for accounting and fraud detection"
+    }
+  ],
+  "documents": [
+    {
+      "source_key": "otel-demo-architecture",
+      "title": "Demo Architecture",
+      "kind": "architecture",
+      "service": null,
+      "local_path": "datasets/corpus/otel-demo/architecture.md",
+      "source_url": "https://opentelemetry.io/docs/demo/architecture/",
+      "source_file_url": "https://github.com/open-telemetry/opentelemetry.io/blob/145fd1194b631f2292d816d4d65d26b6c5a4aebd/content/en/docs/demo/architecture.md",
+      "source_revision": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
+      "modified": false
+    },
+    {
+      "source_key": "otel-demo-docker-deployment",
+      "title": "Docker deployment",
+      "kind": "deployment",
+      "service": null,
+      "local_path": "datasets/corpus/otel-demo/docker-deployment.md",
+      "source_url": "https://opentelemetry.io/docs/demo/docker-deployment/",
+      "source_file_url": "https://github.com/open-telemetry/opentelemetry.io/blob/145fd1194b631f2292d816d4d65d26b6c5a4aebd/content/en/docs/demo/docker-deployment.md",
+      "source_revision": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
+      "modified": false
+    },
+    {
+      "source_key": "otel-demo-service-checkout",
+      "title": "Checkout Service",
+      "kind": "service",
+      "service": "checkout",
+      "local_path": "datasets/corpus/otel-demo/service-checkout.md",
+      "source_url": "https://opentelemetry.io/docs/demo/services/checkout/",
+      "source_file_url": "https://github.com/open-telemetry/opentelemetry.io/blob/145fd1194b631f2292d816d4d65d26b6c5a4aebd/content/en/docs/demo/services/checkout.md",
+      "source_revision": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
+      "modified": false
+    },
+    {
+      "source_key": "otel-demo-service-cart",
+      "title": "Cart Service",
+      "kind": "service",
+      "service": "cart",
+      "local_path": "datasets/corpus/otel-demo/service-cart.md",
+      "source_url": "https://opentelemetry.io/docs/demo/services/cart/",
+      "source_file_url": "https://github.com/open-telemetry/opentelemetry.io/blob/145fd1194b631f2292d816d4d65d26b6c5a4aebd/content/en/docs/demo/services/cart/index.md",
+      "source_revision": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
+      "modified": false
+    },
+    {
+      "source_key": "otel-demo-service-payment",
+      "title": "Payment Service",
+      "kind": "service",
+      "service": "payment",
+      "local_path": "datasets/corpus/otel-demo/service-payment.md",
+      "source_url": "https://opentelemetry.io/docs/demo/services/payment/",
+      "source_file_url": "https://github.com/open-telemetry/opentelemetry.io/blob/145fd1194b631f2292d816d4d65d26b6c5a4aebd/content/en/docs/demo/services/payment.md",
+      "source_revision": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
+      "modified": false
+    },
+    {
+      "source_key": "otel-demo-service-shipping",
+      "title": "Shipping Service",
+      "kind": "service",
+      "service": "shipping",
+      "local_path": "datasets/corpus/otel-demo/service-shipping.md",
+      "source_url": "https://opentelemetry.io/docs/demo/services/shipping/",
+      "source_file_url": "https://github.com/open-telemetry/opentelemetry.io/blob/145fd1194b631f2292d816d4d65d26b6c5a4aebd/content/en/docs/demo/services/shipping.md",
+      "source_revision": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
+      "modified": false
+    },
+    {
+      "source_key": "otel-demo-service-currency",
+      "title": "Currency Service",
+      "kind": "service",
+      "service": "currency",
+      "local_path": "datasets/corpus/otel-demo/service-currency.md",
+      "source_url": "https://opentelemetry.io/docs/demo/services/currency/",
+      "source_file_url": "https://github.com/open-telemetry/opentelemetry.io/blob/145fd1194b631f2292d816d4d65d26b6c5a4aebd/content/en/docs/demo/services/currency.md",
+      "source_revision": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
+      "modified": false
+    },
+    {
+      "source_key": "otel-demo-service-product-catalog",
+      "title": "Product Catalog Service",
+      "kind": "service",
+      "service": "product-catalog",
+      "local_path": "datasets/corpus/otel-demo/service-product-catalog.md",
+      "source_url": "https://opentelemetry.io/docs/demo/services/product-catalog/",
+      "source_file_url": "https://github.com/open-telemetry/opentelemetry.io/blob/145fd1194b631f2292d816d4d65d26b6c5a4aebd/content/en/docs/demo/services/product-catalog.md",
+      "source_revision": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
+      "modified": false
+    },
+    {
+      "source_key": "otel-demo-service-email",
+      "title": "Email Service",
+      "kind": "service",
+      "service": "email",
+      "local_path": "datasets/corpus/otel-demo/service-email.md",
+      "source_url": "https://opentelemetry.io/docs/demo/services/email/",
+      "source_file_url": "https://github.com/open-telemetry/opentelemetry.io/blob/145fd1194b631f2292d816d4d65d26b6c5a4aebd/content/en/docs/demo/services/email.md",
+      "source_revision": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
+      "modified": false
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+# Local development stack: PostgreSQL/pgvector, a one-shot migration job, and the API.
+# The frontend runs on the host with pnpm (see README).
+#
+# Inside this network the database is reachable at db:5432. From the host it is
+# published on 127.0.0.1:${DB_HOST_PORT:-5433} for inspection tools only; all
+# backend commands in the Makefile run inside containers.
+
+x-backend: &backend
+  build:
+    context: apps/backend
+  image: cloudops-ai-backend:local
+  environment:
+    DATABASE_URL: postgresql+asyncpg://cloudops:cloudops@db:5432/cloudops
+    PROVIDER_MODE: ${PROVIDER_MODE:-mock}
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    DATASETS_DIR: /srv/datasets
+  volumes:
+    - ./datasets:/srv/datasets:ro
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.1-pg17
+    environment:
+      POSTGRES_USER: cloudops
+      POSTGRES_PASSWORD: cloudops  # local-only development credential
+      POSTGRES_DB: cloudops
+    ports:
+      - "127.0.0.1:${DB_HOST_PORT:-5433}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudops -d cloudops"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    <<: *backend
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  db-data:
