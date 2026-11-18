@@ -375,24 +375,29 @@ Report fields: summary, affected service, likely cause, alternative hypotheses, 
 
 Plan for 6–8 hours of implementation, 1–2 hours of official documentation, and 1–2 hours of testing/documentation each week. Create one GitHub milestone per week and convert the checkboxes into issues as needed. If a gate fails, fix it before taking on stretch work.
 
-### Week 1 — Foundation and reproducible local environment
+### Week 1 — Foundation, local environment, and document corpus
 
-**Outcome:** a working application skeleton and representative synthetic data.
+*Revised 2026-11-17 for the OpenTelemetry Demo direction. Week 1 has no RAG inference, investigation workflow, worker, provider mocks, or cloud resources.*
 
-- [ ] Create the monorepo, lockfiles, Docker Compose, configuration validation, and `.env.example`.
-- [ ] Implement API health checks, a minimal React page, migrations, and provider interfaces.
-- [ ] Seed the five fictional services and at least 12 runbooks covering the six incident families below.
-- [ ] Create the evaluation manifest and separate development/test case IDs before tuning begins.
-- [ ] Add CI for formatting, static checks, backend tests, and frontend build.
+**Outcome:** a reproducible local application skeleton and a provenance-tracked corpus of OpenTelemetry Demo documentation focused on the checkout flow.
 
-**Deliverables:** runnable skeleton, seed script, initial schema, README setup instructions, ADRs 001–002.
+- [x] Create the monorepo layout, pinned toolchains (uv, pnpm, Node 24), lockfiles, Docker Compose, configuration validation, and `.env.example`.
+- [x] Implement `/health/live` and a bounded `/health/ready` (database plus `vector` extension), structured logs with request IDs, and an Alembic migration.
+- [x] Select and copy official demo docs (architecture, Docker deployment, checkout-path services), recording source URL, docs commit, application version, retrieval date, and license.
+- [x] Seed reference services and document metadata transactionally with stable identifiers.
+- [x] Define the evaluation case schema, incident groups, and dev/test separation rules; add a few fully labeled development cases.
+- [x] Build a minimal React page showing live readiness through the Vite proxy.
+- [x] Add CI for formatting, linting, type checks, backend tests on pgvector, frontend tests and build, and secret scanning.
+
+**Deliverables:** runnable local stack, seed script, initial schema, corpus manifest, evaluation schema and dev cases, README, architecture notes, ADRs 001–002.
 
 **Acceptance criteria:**
 
-- [ ] A clean checkout can start locally using documented commands and mock providers without AWS credentials.
-- [ ] API readiness checks the database; failed configuration produces a clear error.
-- [ ] Migrations and seeds can be repeated without duplicate fixture records.
-- [ ] CI passes and no credentials or private data are committed.
+- [x] A clean checkout starts locally from documented commands without AWS credentials.
+- [x] Readiness returns 200 with the database available; a database outage gives a prompt 503 while liveness stays up, and readiness recovers.
+- [x] Invalid configuration (including `PROVIDER_MODE=aws`) fails at startup with an actionable message.
+- [x] Migrations and seeding are repeatable without duplicates or changed identifiers.
+- [x] Tests use an isolated database; CI passes; no credentials or private data are committed.
 
 **Official learning resources:** [FastAPI tutorial](https://fastapi.tiangolo.com/tutorial/) for validation and dependency injection; [Docker Compose quickstart](https://docs.docker.com/compose/gettingstarted/) for services and configuration; [pytest getting started](https://docs.pytest.org/en/stable/getting-started.html) for fixtures and assertions. Apply them by building one request-to-database integration test.
 
