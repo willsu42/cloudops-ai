@@ -178,6 +178,42 @@
       "source_file_url": "https://github.com/open-telemetry/opentelemetry.io/blob/145fd1194b631f2292d816d4d65d26b6c5a4aebd/content/en/docs/demo/services/email.md",
       "source_revision": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
       "modified": false
+    },
+    {
+      "source_key": "otel-demo-service-quote",
+      "title": "Quote Service",
+      "kind": "service",
+      "service": "quote",
+      "local_path": "datasets/corpus/otel-demo/service-quote.md",
+      "source_url": "https://opentelemetry.io/docs/demo/services/quote/",
+      "source_file_url": "https://github.com/open-telemetry/opentelemetry.io/blob/145fd1194b631f2292d816d4d65d26b6c5a4aebd/content/en/docs/demo/services/quote.md",
+      "source_revision": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
+      "modified": false,
+      "retrieved_on": "2026-11-23"
+    },
+    {
+      "source_key": "otel-demo-service-frontend",
+      "title": "Frontend",
+      "kind": "service",
+      "service": "frontend",
+      "local_path": "datasets/corpus/otel-demo/service-frontend.md",
+      "source_url": "https://opentelemetry.io/docs/demo/services/frontend/",
+      "source_file_url": "https://github.com/open-telemetry/opentelemetry.io/blob/145fd1194b631f2292d816d4d65d26b6c5a4aebd/content/en/docs/demo/services/frontend.md",
+      "source_revision": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
+      "modified": false,
+      "retrieved_on": "2026-11-23"
+    },
+    {
+      "source_key": "otel-demo-service-kafka",
+      "title": "Kafka",
+      "kind": "service",
+      "service": "kafka",
+      "local_path": "datasets/corpus/otel-demo/service-kafka.md",
+      "source_url": "https://opentelemetry.io/docs/demo/services/kafka/",
+      "source_file_url": "https://github.com/open-telemetry/opentelemetry.io/blob/145fd1194b631f2292d816d4d65d26b6c5a4aebd/content/en/docs/demo/services/kafka.md",
+      "source_revision": "145fd1194b631f2292d816d4d65d26b6c5a4aebd",
+      "modified": false,
+      "retrieved_on": "2026-11-23"
     }
   ]
 }

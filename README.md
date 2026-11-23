@@ -4,7 +4,7 @@ An evidence-grounded incident investigation assistant, under construction. The r
 system is the [OpenTelemetry Demo](https://opentelemetry.io/docs/demo/), starting
 with its checkout flow.
 
-> **Status: Week 1 foundation.** This repository currently contains a local
+> **Status: Week 1 foundation, plus Week 2 phases 2A–2B.** This repository currently contains a local
 > application skeleton (API health checks, database schema, seed data, a status
 > page) and a document corpus. It does **not** yet ingest documents, retrieve,
 > answer questions, investigate incidents, or deploy to AWS. See
@@ -16,9 +16,10 @@ with its checkout flow.
 | --- | --- |
 | API ([apps/backend](apps/backend)) | FastAPI with `GET /health/live` and `GET /health/ready`. Readiness checks PostgreSQL and the `vector` extension under a short deadline. |
 | Database | PostgreSQL 17 + pgvector, migrated with Alembic. Tables: `services`, `documents`, `document_versions` (metadata only). |
-| Corpus ([datasets/corpus](datasets/corpus)) | 9 OpenTelemetry Demo documentation pages (architecture, Docker deployment, checkout-path services), copied unmodified with provenance. |
+| Corpus ([datasets/corpus](datasets/corpus)) | 12 OpenTelemetry Demo documentation pages (architecture, Docker deployment, the checkout path from frontend through quote and Kafka), copied unmodified with provenance. |
 | Seed | `python -m app.seed` loads services and document metadata. Safe to repeat. |
-| Evaluation ([datasets/evaluation](datasets/evaluation)) | Case schema, split rules, and 7 labeled development cases. No held-out test set yet. |
+| Parsing and chunking ([apps/backend/app/rag](apps/backend/app/rag)) | Pure functions (Week 2, phase 2B). They turn corpus Markdown into heading-aware chunks with line ranges. Not wired into a pipeline or the database yet. |
+| Evaluation ([datasets/evaluation](datasets/evaluation)) | Case schema, split rules, and 11 labeled development cases. No held-out test set yet. |
 | Frontend ([apps/frontend](apps/frontend)) | React page showing live backend readiness. |
 | CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) | Lint, type checks, tests (backend on pgvector), frontend build, secret scanning. |
 
@@ -152,7 +153,7 @@ docs/             Project plan, architecture, ADRs
 
 ## Current limitations
 
-- No document parsing, chunking, embeddings, retrieval, or model calls.
+- Chunks are computed in memory only. No ingestion pipeline, stored chunks, embeddings, retrieval, or model calls yet.
 - No authentication. The API is bound to `127.0.0.1` and meant for local use only.
 - No investigation workflow, tools, jobs, or worker process.
 - No AWS infrastructure or deployment.

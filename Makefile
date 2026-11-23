@@ -30,10 +30,10 @@ clean: ## DESTRUCTIVE: stop containers and delete the local database volume
 	$(COMPOSE) down --volumes
 
 migrate: ## Apply database migrations (inside Compose)
-	$(COMPOSE) run --rm migrate
+	$(COMPOSE) run --rm --build migrate
 
 seed: ## Load services and corpus metadata (inside Compose; safe to repeat)
-	$(COMPOSE) run --rm api python -m app.seed
+	$(COMPOSE) run --rm --build api python -m app.seed
 
 logs: ## Follow API logs
 	$(COMPOSE) logs -f api

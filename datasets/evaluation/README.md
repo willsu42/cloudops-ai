@@ -7,7 +7,7 @@ ingested. It holds questions together with their expected answers.
 
 | File | Status |
 | --- | --- |
-| `dev.jsonl` | 7 development cases about the OpenTelemetry Demo documentation (6 answerable, 1 insufficient-evidence). Use them freely while building and tuning. |
+| `dev.jsonl` | 11 development cases about the OpenTelemetry Demo documentation (9 answerable, 2 insufficient-evidence). Use them freely while building and tuning. |
 | `test.jsonl` | **Not created yet.** See "Held-out set" below. |
 
 The schema is `EvaluationCase` in

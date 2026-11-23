@@ -20,11 +20,15 @@ in `datasets/evaluation_private/` and are never ingested.
 | `service-currency.md` | <https://opentelemetry.io/docs/demo/services/currency/> |
 | `service-product-catalog.md` | <https://opentelemetry.io/docs/demo/services/product-catalog/> |
 | `service-email.md` | <https://opentelemetry.io/docs/demo/services/email/> |
+| `service-quote.md` | <https://opentelemetry.io/docs/demo/services/quote/> |
+| `service-frontend.md` | <https://opentelemetry.io/docs/demo/services/frontend/> |
+| `service-kafka.md` | <https://opentelemetry.io/docs/demo/services/kafka/> |
 
 **Attribution.** © OpenTelemetry Authors. These files are copied **unmodified**
 (byte-for-byte, including Hugo front matter and shortcodes) from
 [open-telemetry/opentelemetry.io](https://github.com/open-telemetry/opentelemetry.io)
-at commit `145fd1194b631f2292d816d4d65d26b6c5a4aebd`, retrieved 2026-11-17.
+at commit `145fd1194b631f2292d816d4d65d26b6c5a4aebd`. The first nine were retrieved
+2026-11-17. Quote, frontend, and kafka were added 2026-11-23 from the same commit.
 They are licensed under
 [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
 That license applies to these files only, not to the rest of this repository.
@@ -63,5 +67,5 @@ product-catalog page mentions that the service sets span status when a feature
 flag forces an error. It is kept because that passage explains
 instrumentation, not how to trigger the fault.
 
-The quote service has a docs page that is not yet in the corpus. Add it when
-shipping-quote questions need it.
+Quote, frontend, and kafka complete the checkout path: frontend calls checkout,
+shipping calls quote, and checkout publishes orders to Kafka.

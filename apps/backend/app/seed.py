@@ -54,6 +54,8 @@ class ManifestDocument(_Strict):
     source_file_url: str
     source_revision: str
     modified: bool
+    # Overrides the manifest-level retrieval date for documents fetched later.
+    retrieved_on: date | None = None
 
 
 class DocumentationSource(_Strict):
@@ -134,7 +136,7 @@ def build_rows(manifest: Manifest, repo_root: Path) -> dict[str, list[dict[str, 
                 "local_path": doc.local_path,
                 "content_sha256": hashlib.sha256(content).hexdigest(),
                 "byte_size": len(content),
-                "retrieved_on": manifest.retrieved_on,
+                "retrieved_on": doc.retrieved_on or manifest.retrieved_on,
                 "license": src.license,
                 "attribution": src.attribution,
                 "modified": doc.modified,
