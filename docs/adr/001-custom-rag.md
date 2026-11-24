@@ -42,4 +42,5 @@ installed.
 - Bedrock Knowledge Bases remains a possible comparison once release gates
   pass (stretch work in PROJECT_PLAN §2).
 - Revisit if the corpus or operational load grows beyond what a single
-  PostgreSQL instance handles well (see ADR 003, planned).
+  PostgreSQL instance handles well. ADR 003 (decision 6) defers an ANN index
+  until the corpus needs one.

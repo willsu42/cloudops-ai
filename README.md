@@ -4,10 +4,11 @@ An evidence-grounded incident investigation assistant, under construction. The r
 system is the [OpenTelemetry Demo](https://opentelemetry.io/docs/demo/), starting
 with its checkout flow.
 
-> **Status: Week 1 foundation, plus Week 2 phases 2A–2B.** This repository currently contains a local
+> **Status: Week 1 foundation, plus Week 2 phases 2A–2C.** This repository currently contains a local
 > application skeleton (API health checks, database schema, seed data, a status
-> page) and a document corpus. It does **not** yet ingest documents, retrieve,
-> answer questions, investigate incidents, or deploy to AWS. See
+> page), a document corpus, and an ingestion pipeline that stores chunks with
+> **mock** embeddings. It does **not** yet retrieve, answer questions,
+> investigate incidents, call a real model, or deploy to AWS. See
 > [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for the roadmap.
 
 ## What exists
@@ -15,10 +16,11 @@ with its checkout flow.
 | Part | Description |
 | --- | --- |
 | API ([apps/backend](apps/backend)) | FastAPI with `GET /health/live` and `GET /health/ready`. Readiness checks PostgreSQL and the `vector` extension under a short deadline. |
-| Database | PostgreSQL 17 + pgvector, migrated with Alembic. Tables: `services`, `documents`, `document_versions` (metadata only). |
+| Database | PostgreSQL 17 + pgvector, migrated with Alembic. Tables: `services`, `documents`, `document_versions`, plus `ingestion_runs`, `chunk_sets`, `document_chunks` (`vector(1024)`). |
 | Corpus ([datasets/corpus](datasets/corpus)) | 12 OpenTelemetry Demo documentation pages (architecture, Docker deployment, the checkout path from frontend through quote and Kafka), copied unmodified with provenance. |
 | Seed | `python -m app.seed` loads services and document metadata. Safe to repeat. |
-| Parsing and chunking ([apps/backend/app/rag](apps/backend/app/rag)) | Pure functions (Week 2, phase 2B). They turn corpus Markdown into heading-aware chunks with line ranges. Not wired into a pipeline or the database yet. |
+| Parsing and chunking ([apps/backend/app/rag](apps/backend/app/rag)) | Pure functions (phase 2B). They turn corpus Markdown into heading-aware chunks with line ranges. |
+| Ingestion ([apps/backend/app/ingest.py](apps/backend/app/ingest.py)) | `python -m app.ingest` chunks and embeds every corpus document and stores 104 chunks. Repeat runs skip unchanged documents. A failed run keeps the previous chunks active. Only Markdown is accepted. Embeddings come from a deterministic **mock** with no semantic meaning. See [ADR 003](docs/adr/003-chunk-storage-and-embeddings.md). |
 | Evaluation ([datasets/evaluation](datasets/evaluation)) | Case schema, split rules, and 11 labeled development cases. No held-out test set yet. |
 | Frontend ([apps/frontend](apps/frontend)) | React page showing live backend readiness. |
 | CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) | Lint, type checks, tests (backend on pgvector), frontend build, secret scanning. |
@@ -57,6 +59,7 @@ From a fresh clone:
 make setup      # install backend (uv) and frontend (pnpm) dependencies from lockfiles
 make up         # build the API image, start PostgreSQL, run migrations, start the API
 make seed       # load services and corpus metadata (repeatable)
+make ingest     # chunk, embed (mock), and store the corpus (repeatable)
 make frontend   # start the Vite dev server at http://localhost:5173
 ```
 
@@ -126,6 +129,7 @@ Main backend test coverage:
 - a refused or hanging database gives a bounded 503 while liveness stays up
 - outage and recovery through a toggling TCP proxy
 - repeat seeding keeps identical rows
+- ingestion: repeat runs keep chunk IDs, failed embeddings keep the previous active chunks, model switches swap atomically, changed files and PDFs are refused
 - corpus manifest and evaluation split rules
 
 ## Troubleshooting
@@ -138,7 +142,8 @@ Main backend test coverage:
 | Status page shows **Unavailable** | The API runs but the database is not ready. Check `docker compose ps db` and `make logs`. |
 | `pnpm: command not found` | Install pnpm (see Prerequisites) or use `make PNPM="npx --yes pnpm@12.17.0" ...`. |
 | uv warns `VIRTUAL_ENV ... does not match` | Another virtualenv (e.g. Conda) is active. Run `unset VIRTUAL_ENV` or deactivate it. Harmless otherwise. |
-| `Invalid configuration: ... PROVIDER_MODE` | Only `mock` is supported in Week 1. |
+| `Invalid configuration: ... PROVIDER_MODE` | Only `mock` is supported until the Bedrock adapter passes a real smoke test. |
+| Ingest reports `no seeded document version matches` | Run `make seed` first. If you did, a corpus file changed: restore it, or record a new revision. |
 | Seed fails with a unique-constraint error on `document_versions` | A corpus file changed without a new `source_revision` in the manifest. Restore the file or record the new revision. |
 
 ## Repository layout
@@ -146,14 +151,15 @@ Main backend test coverage:
 ```text
 apps/backend/     FastAPI app, Alembic migrations, tests (uv project)
 apps/frontend/    React + Vite status page (pnpm project)
-datasets/corpus/  Knowledge corpus + manifest (ingested in later weeks)
+datasets/corpus/  Knowledge corpus + manifest (ingested by `make ingest`)
 datasets/evaluation/  Evaluation cases (never ingested)
 docs/             Project plan, architecture, ADRs
 ```
 
 ## Current limitations
 
-- Chunks are computed in memory only. No ingestion pipeline, stored chunks, embeddings, retrieval, or model calls yet.
+- Embeddings are mock vectors only, so nothing yet measures retrieval quality. No retrieval, question answering, or model calls yet.
+- Only Markdown is ingested. PDF and other formats are rejected with an explicit error.
 - No authentication. The API is bound to `127.0.0.1` and meant for local use only.
 - No investigation workflow, tools, jobs, or worker process.
 - No AWS infrastructure or deployment.
@@ -163,7 +169,7 @@ docs/             Project plan, architecture, ADRs
 
 - [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md): eight-week plan (see its 2026-11-17 revision note)
 - [docs/architecture.md](docs/architecture.md): implemented local architecture vs. target
-- [docs/adr/](docs/adr/): architecture decision records
+- [docs/adr/](docs/adr/): architecture decision records (003: chunk storage, embedding dimension, accepted formats)
 - [datasets/corpus/README.md](datasets/corpus/README.md): corpus sources and attribution
 
 ## License

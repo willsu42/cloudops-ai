@@ -1,109 +1,171 @@
-# 交接紀錄：Week 2（2A、2B 已完成，接下來是 2C）
+# Handoff: Week 2 (2A–2C done, 2D next)
 
-> 給下次啟動的人（或 Claude）。2C–2H 照這份接著做。Week 2 全部完成後刪除本檔。
-> 完整的分階段設計在 `/Users/willsu/.claude/plans/based-on-this-plan-wiggly-simon.md`。這份交接已經包含該檔的必要內容。
+> For whoever picks this up next, person or Claude. Continue 2D–2H from this
+> file, and delete it once Week 2 is complete.
+> The original phase design is in
+> `/Users/willsu/.claude/plans/based-on-this-plan-wiggly-simon.md`. That file
+> now holds the 2C plan.
 
-## 1. 方向與限制（沿用 Week 1）
+## 1. Direction and constraints (carried over from Week 1)
 
-- 參考系統是 OpenTelemetry Demo，聚焦 checkout 流程。Week 2 的目標是文件的 ingestion 加上基本 RAG，答案要附可解析的引用。
-- **AWS 還沒開通。** Week 2 全程用 mock provider。Bedrock adapter 只寫程式碼、用 stub 測試，真實的 smoke test 等開通後再補。
-- Mock embedding 只驗證流程，**不能**拿來宣稱檢索品質。
-- 未經使用者明確要求，不 commit、不 push、不部署、不呼叫付費 API、不加 LICENSE。commit 之前先問。
-- 每個階段一個 commit，push 後確認 CI 綠燈。
+- The reference system is the OpenTelemetry Demo, scoped to the checkout flow.
+  Week 2's goal is document ingestion plus basic RAG, with answers that carry
+  traceable citations.
+- **AWS is not enabled yet.** All of Week 2 runs on mock providers. The Bedrock
+  adapter is written and tested with stubs only. The smoke test against real
+  AWS comes after the account is enabled.
+- Mock embeddings only show that the pipeline runs end to end. They are **not**
+  evidence of retrieval quality.
+- Commit, push, deploy, call paid APIs, or add a LICENSE only when the user
+  explicitly asks. Ask before every commit.
+- One commit per phase. After each push, confirm CI is green.
 
-## 2. 本輪完成的內容
+## 2. Done
 
-**本輪的變更都還沒 commit**，基準是 `0ac8649`。
+- **2A and 2B:** pushed as `2ab5ec8`. CI run 45206813408 passed every job.
+  - The corpus has 12 Markdown documents and 11 dev cases.
+  - Parsing and chunking live in `app/rag/parsing.py` and
+    `app/rag/chunking.py`. The chunker version is `md-heading-v1`.
+  - **Correction:** the earlier "105 chunks" was an outdated figure. Under the
+    current rules, the 12 documents produce **104 chunks**.
+- **2C, ingestion pipeline and schema:** done, **not committed yet**.
+  - The user confirmed two decisions on 2026-11-24:
+    - The vector dimension is **1024**.
+    - PDF is **rejected explicitly** and not parsed.
+  - Reasons, alternatives, limitations, and future extensions for these
+    decisions are recorded in
+    **`docs/adr/003-chunk-storage-and-embeddings.md`**.
 
-### 2A 語料與案例擴充
-- 從同一個 docs commit `145fd11` 新增 `service-quote.md`、`service-frontend.md`、`service-kafka.md`，原文未改動，manifest 共 12 份。
-- `manifest.json` 的文件項目新增選填欄位 `retrieved_on`。這三份是 2026-11-23 取得的，其餘沿用 manifest 層級的 2026-11-17。`app/seed.py` 的 `ManifestDocument` 已支援這個欄位。
-- `dev.jsonl` 從 7 個增加到 11 個：新增 `dev-quote-001`、`dev-kafka-001`、`dev-frontend-001`、`dev-insufficient-002`。
-- 更新了 `datasets/corpus/README.md`、`datasets/evaluation/README.md`、根目錄 `README.md`。
-- **Makefile 修正：** `migrate` 和 `seed` 改用 `docker compose run --rm --build`。原本會用到舊的 image，跑到舊程式碼。
-- 驗證結果：`make seed` 跑兩次，都是 12 docs / 12 versions，retrieved_on 為 9 筆 11-17、3 筆 11-23。
+### What 2C contains
 
-### 2B 解析與切塊（純函式）
-- `app/rag/parsing.py` 的 `parse_markdown(source) -> ParsedDocument(title, blocks)`：
-  - Block 有三種 kind：`heading`、`text`、`code`，記錄 1-based 的 `start_line` / `end_line`。
-  - 移除 front matter、Hugo shortcode、單行 HTML 註解。
-  - fenced code（``` 或 ~~~，可縮排）保持原樣，裡面的 `#` 不會被當成標題。
-- `app/rag/chunking.py` 的 `chunk_markdown(source, **limits) -> list[Chunk]`：
-  - Chunk 欄位：`index`、`text`、`heading_path`、`start_line`、`end_line`、`token_estimate`、`content_sha256`、`chunker_version`。
-  - `CHUNKER_VERSION = "md-heading-v1"`；預設 `max_tokens=500`、`overlap_tokens=75`、`max_code_tokens=1000`。
-  - token 數是估計值，約 4 個字元算 1 token，不是模型的 tokenizer。
-  - 規則：
-    - 依 section 打包，chunk 不跨 section。
-    - heading 和它後面的內容放在同一個 chunk。
-    - 不超過 1000 token 的 code block 不切；更大的依行切開，每段重新補上 fence。
-    - overlap 只取完整的 text block，不取 code，也不跨 section。
-- 實際語料的切塊結果：12 份共 **105 chunk**，最大 807 token（architecture.md 的 mermaid 服務圖，整塊保留）。
-- 刻意保留的部分：frontend、payment 的「TBD」小段（約 3 token）照原文保留，可作為「文件沒寫這部分」的 abstain 證據。
-- 測試在 `tests/unit/test_chunking.py`，共 23 個，涵蓋：heading 路徑、行號回對原文、code 不被切開、超大 code 和段落的切分、overlap 不跨 section、可重現性、參數檢查、實際語料逐份檢查、架構圖為單一 chunk。
+- **Migration `0002_chunks.py`:**
+  - `ingestion_runs`: audit records with status, counts, and error.
+  - `chunk_sets`: one row per (document version × chunker version × embedding
+    model), with an `is_active` column. A partial unique index allows only one
+    active set per document.
+  - `document_chunks`: holds `embedding vector(1024)` (dimension fixed in the
+    migration), `heading_path text[]`, the line range, and a denormalized
+    `document_version_id`.
+- **`app/db/models.py`:** three new ORM classes and `EMBEDDING_DIM = 1024`.
+- **`app/providers/embeddings.py`:**
+  - `EmbeddingProvider` protocol, with an async `embed`.
+  - `MockEmbeddingProvider` (`mock-hash-v1`): vectors from SHAKE-256,
+    L2-normalized, with no semantic meaning.
+  - `validate_embeddings` and `get_embedding_provider`.
+- **`app/ingest.py`:** run with `python -m app.ingest` or `make ingest`.
+  - Only `.md` is accepted. Any other format returns
+    `unsupported format '.pdf': only Markdown (.md) is ingested`.
+  - Each file is matched to its seeded version by content hash. On a mismatch
+    nothing is written, so no chunk is ever built from content that differs
+    from the recorded version.
+  - Chunk set IDs are UUIDv5 values:
+    - An already active set is skipped.
+    - An existing but inactive set is re-activated without re-embedding.
+    - A new set is written and switched to active in a single transaction.
+  - Each document uses its own transaction, so one failure doesn't affect the
+    others. If any document fails, the run is marked `failed` and the CLI
+    exits 1.
+  - Error messages are truncated. Database errors record only the exception
+    type, never parameters.
+- **Dependencies:** added `pgvector==0.4.2`, which brings in numpy. The mypy
+  config sets `ignore_missing_imports` for `pgvector.*`.
+  - **Note:** do not call `register_vector` on asyncpg. It conflicts with the
+    text binding of SQLAlchemy's `VECTOR` type; trying it produced write
+    errors.
+- **Makefile:** new `ingest` target.
+- **Docs:** added ADR 003. Updated the README, the ER diagram in
+  architecture.md, and the cross-reference in ADR 001.
 
-### 驗證結果（本機）
-| 檢查 | 結果 |
+### Verification (local)
+
+| Check | Result |
 | --- | --- |
-| 後端測試（真實 pgvector test DB） | 40 passed |
-| ruff format、ruff check、mypy strict | 全過 |
-| 前端測試 | 5 passed |
+| Backend tests (real pgvector test DB) | 57 passed (new: `test_embeddings.py`, `test_ingest.py`) |
+| ruff format, ruff check, mypy strict, `uv lock --check` | All pass |
+| Compose: `make up`, `make seed`, then `make ingest` twice | First run: 12 documents ingested, 104 chunks. Second run: all 12 skipped. `format_type` = `vector(1024)`, 12 active sets |
+| Migration 0002 downgrade, then upgrade | Works |
 
-GitHub CI 尚未執行，因為還沒 push。
+GitHub CI has not run yet; it runs after a push.
 
-## 3. 接下來的階段
+## 3. Remaining phases
 
-依賴關係：2C → 2D → 2E → 2F；2G 在 2C/2E 之後任何時間都可以做；2H 最後。
+Dependencies: 2D → 2E → 2F. 2G can happen any time after 2E. 2H comes last.
 
-### 2C Ingestion 管線與 schema
-- **migration `0002`：** 建立 `document_chunks`。
-  - 欄位：id（UUIDv5，由 `version_id` + `chunker_version` + `index` 算出）、`document_version_id` FK、`index`、`text`、`heading_path`（`text[]`）、`start_line`、`end_line`、`token_estimate`、`content_sha256`、`chunker_version`、`embedding_model`、`embedding_dim`、`embedding vector(1024)`。
-  - **維度寫死在 migration 裡，不從設定讀取。**
-  - 另建 `ingestion_runs`：記錄狀態、錯誤、時間、chunk 數。
-- **`app/providers/embeddings.py`：**
-  - `EmbeddingProvider` Protocol：`model_id`、`dim`、`embed(texts) -> list[list[float]]`。
-  - `MockEmbeddingProvider`：用 hash 產生 1024 維、正規化過的向量。docstring 寫明只驗證流程。
-- **`app/ingest.py` 與 `make ingest`：**
-  - 讀 manifest，對每個 active document_version 呼叫 `chunk_markdown`，再做 embedding 並寫入。
-  - 同一個 version 加同一組 `(chunker_version, embedding_model)` 已存在時跳過。
-  - 新的一組寫入成功後才啟用，然後停用舊的；失敗時舊的保持 active。
-  - 需要「active」的概念：在 chunk 或 version 上加 `is_active`，或建一張 active set 表，由 2C 決定。
-- **重用：** `app/seed.py` 的 `load_manifest`、`version_id`、`ON CONFLICT` 寫法；`tests/conftest.py` 的 `migrated_database`、`db_engine`。
-- **測試：** 重跑兩次 chunk 數和 ID 不變；故意讓 embedding 失敗時舊資料仍是 active。
+### 2D Retrieval and source API
 
-### 2D 檢索與 source API
-- `app/rag/retrieval.py`：用 `<=>` 做 exact cosine search，先套用 service 和 active 過濾再排序，取 top-k。空檢索門檻寫進設定。
-- `GET /api/sources/{chunk_id}`：回傳 text、heading_path、行號、source_url、source_file_url、版本。不存在或未 active 時回 404。
+- `app/rag/retrieval.py`:
+  - Exact cosine search with `<=>`, **over chunks in active `chunk_sets`
+    only**.
+  - Optional service filter: JOIN on `documents.service_slug`.
+  - Apply filters before ranking, then take the top k.
+  - Embed the query with the same provider. Check that its `model_id` matches
+    the active sets' `embedding_model`, and raise an error if not, because
+    vectors from different models can't be compared.
+  - Put the empty-retrieval threshold (a distance cap) in settings.
+- `GET /api/sources/{chunk_id}`:
+  - Returns text, heading_path, the line range, source_url, source_file_url,
+    and version details (source_revision, retrieved_on).
+  - Returns 404 when the chunk doesn't exist or isn't in an active set.
+- Tests:
+  - With the mock provider, querying with a chunk's own text should rank that
+    chunk first, since the vectors are identical.
+  - Filters take effect.
+  - Inactive chunks are never returned.
+  - The source API's 404.
 
-### 2E 生成、引用與 abstain
-- `app/providers/llm.py`：`LLMProvider` Protocol 和決定性的 mock。
-- 答案 schema：summary、claims（每個 claim 帶 citation chunk id）、limitations、abstained。
-- `app/rag/citations.py`：citation 必須在本次檢索結果中，不合格的剔除或標記。空檢索時不呼叫 LLM，直接 abstain。
-- `POST /api/ask`：同步執行，問題長度有上限。
+### 2E Generation, citations, and abstention
 
-### 2F 提問與引用檢視 UI
-- Ask 頁面、引用元件，點引用開出 source 段落。Markdown 要 sanitize，不允許 raw HTML。
-- `vite.config.ts` 的 proxy 加 `/api`。
-- 元件測試涵蓋：答案、abstain、錯誤、開啟引用。
+- `app/providers/llm.py`: an `LLMProvider` protocol and a mock with fixed
+  output.
+- Answer schema: summary, claims (each with a citation chunk ID), limitations,
+  abstained.
+- `app/rag/citations.py`: every citation must appear in this request's
+  retrieval results. Invalid ones are removed or flagged. When retrieval comes
+  back empty, abstain without calling the LLM.
+- `POST /api/ask`: synchronous, with a maximum question length.
 
-### 2G Bedrock adapter（只寫程式）
-- `app/providers/bedrock.py`：Titan V2 走 `invoke_model`，生成走 Converse；用 botocore Stubber 測試。需要新增 boto3 依賴。
-- `PROVIDER_MODE=aws` **仍然拒絕**，等真實 smoke test 通過才開放。
-- 新增 `docs/rag.md`：模型、維度、cosine 距離、重建索引程序，標明「待 AWS 驗證」。
+### 2F Ask and citation UI
 
-### 2H 收尾
-- 12 份文件和 ≥10 個問題用 mock 跑完整流程。
-- 用 fixture 驗證不支援的格式（如 PDF）會回傳明確的 limitation。
-- 更新 README 和 PLAN 第 7 節 Week 2 的勾選，真實 provider 相關的項目標為「待 AWS」。
+- An Ask page and a citation component. Clicking a citation opens the source
+  passage. Sanitize Markdown and disallow raw HTML.
+- Add `/api` to the proxy in `vite.config.ts`.
+- Component tests cover: answer, abstention, errors, opening a citation.
 
-## 4. 未定事項
+### 2G Bedrock adapter (code only)
 
-- **AWS 帳號與 region：** 尚未開通。建議最晚 Week 3 前開通，並申請 Bedrock 模型存取權。
-- **PDF：** 建議只驗證拒絕路徑，使用者尚未明確決定。
-- **向量維度：** 計畫建議 1024（Titan V2 預設），使用者尚未明確確認。**在 2C 寫 migration 之前要先確認**，因為之後改維度需要新的 migration 並重新 embedding。
+- `app/providers/bedrock.py`:
+  - Embeddings use Titan V2 through `invoke_model`, with `dimensions=1024` and
+    `normalize=true`.
+  - Generation uses Converse.
+  - Tests use botocore Stubber.
+  - Needs a new boto3 dependency.
+- `PROVIDER_MODE=aws` **stays refused** until a real smoke test passes.
+- Add `docs/rag.md` covering the model, dimension, cosine distance, and the
+  reindex procedure, marked "pending AWS verification". It can refer to
+  ADR 003.
 
-## 5. 環境提醒
+### 2H Wrap-up
 
-- Node 24 在 `/usr/local/bin`，PATH 上排前面的是 Homebrew 的 Node 25，執行前端前先 `export PATH=/usr/local/bin:$PATH`。pnpm 沒有全域安裝，用 `make PNPM="npx --yes pnpm@12.17.0" ...`。
-- 執行 uv 前先 `unset VIRTUAL_ENV`，避免 Anaconda 的干擾。
-- Docker Desktop 可能沒在執行，用 `open -a Docker` 啟動。
-- 測試資料庫用 `make test-db` 啟動，關閉用 `make test-db-down`。
+- Run the full flow with mocks: 12 documents and at least 10 questions.
+- The PDF rejection path already has a test from 2C ingest
+  (`test_pdf_is_rejected_with_an_explicit_limitation`). Once upload or ask
+  interfaces exist, confirm that the limitation reaches the user.
+- Update the Week 2 checkboxes in the README and PLAN §7. Mark items that
+  depend on a real provider as "pending AWS".
+
+## 4. Open decisions
+
+- **AWS account and region:** not enabled yet. Enable before Week 3 at the
+  latest, and request Bedrock model access.
+- The vector dimension (1024) and PDF handling (reject only) are **decided**;
+  see ADR 003.
+
+## 5. Environment tips
+
+- Node 24 is in `/usr/local/bin`, but Homebrew's Node 25 comes first on PATH.
+  Run `export PATH=/usr/local/bin:$PATH` before frontend commands.
+- pnpm isn't installed globally. Use `make PNPM="npx --yes pnpm@12.17.0" ...`.
+- Run `unset VIRTUAL_ENV` before uv commands to avoid Anaconda interference.
+- Docker Desktop may not be running. Start it with `open -a Docker`.
+- Start the test database with `make test-db`, and stop it with
+  `make test-db-down`.

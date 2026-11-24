@@ -10,7 +10,7 @@ TEST_DATABASE_URL ?= postgresql+asyncpg://cloudops:cloudops@127.0.0.1:$(TEST_DB_
 BACKEND := apps/backend
 FRONTEND := apps/frontend
 
-.PHONY: help setup up down clean migrate seed logs test test-db test-db-down \
+.PHONY: help setup up down clean migrate seed ingest logs test test-db test-db-down \
         test-backend test-frontend lint fmt frontend
 
 help: ## Show available targets
@@ -34,6 +34,9 @@ migrate: ## Apply database migrations (inside Compose)
 
 seed: ## Load services and corpus metadata (inside Compose; safe to repeat)
 	$(COMPOSE) run --rm --build api python -m app.seed
+
+ingest: ## Chunk, embed (mock provider), and store the corpus (inside Compose; run after seed)
+	$(COMPOSE) run --rm --build api python -m app.ingest
 
 logs: ## Follow API logs
 	$(COMPOSE) logs -f api
