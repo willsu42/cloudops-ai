@@ -1,6 +1,6 @@
-# Handoff: Week 2 (2A–2D and hybrid retrieval done, 2E next)
+# Handoff: Week 2 (2A–2E done, 2F next)
 
-> For whoever picks this up next, person or Claude. Continue 2E–2H from this
+> For whoever picks this up next, person or Claude. Continue 2F–2H from this
 > file, and delete it once Week 2 is complete.
 > The original phase design is in
 > `/Users/willsu/.claude/plans/based-on-this-plan-wiggly-simon.md`. That file
@@ -99,7 +99,9 @@ Pushed as `5a31e3f`. CI run 45535981832 passed every job.
 - Settings: `RETRIEVAL_TOP_K` (5) and `RETRIEVAL_MAX_DISTANCE` (0.8).
 - The `seeded` and `ingested` fixtures live in `tests/conftest.py`.
 
-### Hybrid retrieval (ADR 004): done, not committed yet
+### Hybrid retrieval (ADR 004)
+
+Pushed as `19aeb90`. CI run 45537073739 passed every job.
 
 Under mock vectors, natural-language questions retrieved nothing, so the user
 chose (2026-11-25) to add PostgreSQL full-text search now, as ADR 001 had
@@ -142,20 +144,71 @@ planned.
   **not** enough to answer. 2E must abstain when the cited chunks don't
   support a claim, and mock behavior must not fake support.
 
+### 2E Generation, citations, and abstention (ADR 005): done, not committed yet
+
+- **`app/providers/llm.py`:**
+  - `Evidence(label, title, heading_path, text)`.
+  - `LLMProvider.draft_answer(question, evidence) -> str`, returning a JSON
+    draft.
+  - `MockLLMProvider` (`mock-extractive-v1`):
+    - Quotes up to 3 prose sentences or list items verbatim, skipping code,
+      headings, and tables.
+    - A sentence needs at least 2 of the question's content terms and at
+      least half of them.
+    - Abstains otherwise.
+  - `terms()` and `sentences()` helpers.
+- **`app/rag/citations.py`:** `ground(raw, labels)`.
+  - Malformed or invalid draft → abstain (`INVALID_DRAFT`).
+  - A drafted abstention is honored.
+  - Unknown labels are removed. Claims with no valid citation are dropped,
+    with a limitation reporting the count.
+  - Nothing left → abstain (`NO_GROUNDED_CLAIMS`).
+- **`app/rag/answer.py`:** `answer_question(...)`.
+  - Retrieves with hybrid search and labels the passages S1…Sn.
+  - If retrieval is empty, abstains **without calling the LLM**.
+  - Otherwise grounds the draft and resolves citations.
+- **`POST /api/ask` (`app/api/ask.py`):**
+  - Request: `{question (1–1000 chars), services?}`; extra fields are
+    rejected.
+  - Response: `abstained`, `summary`, `claims[{text,
+    citations[{chunk_id, label, source_key, title, heading_path, start_line,
+    end_line}]}]`, `limitations`, `retrieved[...]`, `llm_model`,
+    `embedding_model`.
+  - Errors: 422 schema; 400 blank question or unknown service; 503 index not
+    ready or database unavailable; 502 provider failure. No details leak, and
+    the question is never logged.
+- **Retrieval errors:** `InvalidQuery` (client) and `IndexMismatch` (index)
+  now subclass `RetrievalError`.
+- **Providers:** created in `create_app` and stored as
+  `app.state.embedding_provider` and `app.state.llm_provider`. Tests swap
+  them there.
+- **Tests:**
+  - `tests/unit/test_answer_drafting.py`: terms, sentences, the mock quoting
+    verbatim, abstention, and grounding rules.
+  - `tests/integration/test_ask.py`:
+    - Every claim appears in its cited source, and its citation resolves via
+      `/api/sources`.
+    - Insufficient-evidence questions abstain.
+    - Empty retrieval never calls the LLM.
+    - Fabricated citations are removed.
+    - A malformed draft abstains.
+    - 502, 503, 400, and 422 responses.
+    - Service filter.
+  - A database-down 503 test in `test_health_unavailable.py`.
+- **Local verification:** 109 backend tests pass; ruff and mypy strict pass.
+  In Compose, `/api/ask` answers the quote question with a quoted, cited
+  sentence, and abstains on "What caused the checkout failures…".
+- **Ad-hoc dev run, not a quality claim:**
+  - Both `insufficient_evidence` cases abstained.
+  - 5 of the 9 answerable cases got quoted answers.
+  - The other 4 abstained (deploy ×2, kafka, frontend), because no single
+    sentence covered enough of the question.
+  - The architecture cases cite the shipping, quote, and checkout docs, not
+    `architecture.md`.
+
 ## 3. Remaining phases
 
-Dependencies: 2E → 2F. 2G can happen any time after 2E. 2H comes last.
-
-### 2E Generation, citations, and abstention
-
-- `app/providers/llm.py`: an `LLMProvider` protocol and a mock with fixed
-  output.
-- Answer schema: summary, claims (each with a citation chunk ID), limitations,
-  abstained.
-- `app/rag/citations.py`: every citation must appear in this request's
-  retrieval results. Invalid ones are removed or flagged. When retrieval comes
-  back empty, abstain without calling the LLM.
-- `POST /api/ask`: synchronous, with a maximum question length.
+Dependencies: 2F, and 2G any time. 2H comes last.
 
 ### 2F Ask and citation UI
 
@@ -163,13 +216,18 @@ Dependencies: 2E → 2F. 2G can happen any time after 2E. 2H comes last.
   passage. Sanitize Markdown and disallow raw HTML.
 - Add `/api` to the proxy in `vite.config.ts`.
 - Component tests cover: answer, abstention, errors, opening a citation.
+- Present claims with their citation labels as the evidence. Show the summary
+  as orientation only, and always show the limitations (ADR 005).
+- Clicking a citation calls `GET /api/sources/{chunk_id}` and shows the passage,
+  heading path, line range, and the `source_url` / `source_file_url` links.
 
 ### 2G Bedrock adapter (code only)
 
 - `app/providers/bedrock.py`:
   - Embeddings use Titan V2 through `invoke_model`, with `dimensions=1024` and
     `normalize=true`.
-  - Generation uses Converse.
+  - Generation uses Converse, with a system prompt stating the ADR 005 rules
+    and JSON output. Retry at most once on a malformed draft, then abstain.
   - Tests use botocore Stubber.
   - Needs a new boto3 dependency.
 - `PROVIDER_MODE=aws` **stays refused** until a real smoke test passes.
@@ -190,10 +248,6 @@ Dependencies: 2E → 2F. 2G can happen any time after 2E. 2H comes last.
 
 - **AWS account and region:** not enabled yet. Enable before Week 3 at the
   latest, and request Bedrock model access.
-- **Mock LLM behavior for 2E:** design it so it cannot fake evidence. For
-  example, build claims only from sentences quoted from retrieved chunks, and
-  abstain when no chunk overlaps the question enough. The rule should be
-  recorded in an ADR.
 - The vector dimension (1024) and PDF handling (reject only) are **decided**;
   see ADR 003.
 

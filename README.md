@@ -4,11 +4,12 @@ An evidence-grounded incident investigation assistant, under construction. The r
 system is the [OpenTelemetry Demo](https://opentelemetry.io/docs/demo/), starting
 with its checkout flow.
 
-> **Status: Week 1 foundation, plus Week 2 phases 2A–2D.** This repository currently contains a local
+> **Status: Week 1 foundation, plus Week 2 phases 2A–2E.** This repository currently contains a local
 > application skeleton (API health checks, database schema, seed data, a status
 > page), a document corpus, and an ingestion pipeline that stores chunks with
-> **mock** embeddings, hybrid (full-text + vector) retrieval, and a source lookup API. It does
-> **not** yet answer questions,
+> **mock** embeddings, hybrid (full-text + vector) retrieval, a source lookup API,
+> and a question endpoint whose answers are grounded in citations, using a quoting
+> **mock** model. It does **not** yet
 > investigate incidents, call a real model, or deploy to AWS. See
 > [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for the roadmap.
 
@@ -16,13 +17,14 @@ with its checkout flow.
 
 | Part | Description |
 | --- | --- |
-| API ([apps/backend](apps/backend)) | FastAPI with `GET /health/live`, `GET /health/ready`, and `GET /api/sources/{chunk_id}`. Readiness checks PostgreSQL and the `vector` extension under a short deadline. The source endpoint returns a stored chunk's text, heading path, line range, and document version. It returns 404 unless the chunk is in an active set. |
+| API ([apps/backend](apps/backend)) | FastAPI with `GET /health/live`, `GET /health/ready`, `GET /api/sources/{chunk_id}`, and `POST /api/ask`. Readiness checks PostgreSQL and the `vector` extension under a short deadline. The source endpoint returns a stored chunk's text, heading path, line range, and document version. It returns 404 unless the chunk is in an active set. |
 | Database | PostgreSQL 17 + pgvector, migrated with Alembic. Tables: `services`, `documents`, `document_versions`, plus `ingestion_runs`, `chunk_sets`, `document_chunks` (`vector(1024)`). |
 | Corpus ([datasets/corpus](datasets/corpus)) | 12 OpenTelemetry Demo documentation pages (architecture, Docker deployment, the checkout path from frontend through quote and Kafka), copied unmodified with provenance. |
 | Seed | `python -m app.seed` loads services and document metadata. Safe to repeat. |
 | Parsing and chunking ([apps/backend/app/rag](apps/backend/app/rag)) | Pure functions (phase 2B). They turn corpus Markdown into heading-aware chunks with line ranges. |
 | Ingestion ([apps/backend/app/ingest.py](apps/backend/app/ingest.py)) | `python -m app.ingest` chunks and embeds every corpus document and stores 104 chunks. Repeat runs skip unchanged documents. A failed run keeps the previous chunks active. Only Markdown is accepted. Embeddings come from a deterministic **mock** with no semantic meaning. See [ADR 003](docs/adr/003-chunk-storage-and-embeddings.md). |
-| Retrieval ([apps/backend/app/rag/retrieval.py](apps/backend/app/rag/retrieval.py)) | Hybrid search over active chunks: PostgreSQL full-text (English stemming, any-term match) and exact cosine vector search, fused with Reciprocal Rank Fusion. It has an optional service filter and a vector distance cap. An empty result means "no evidence". It is not exposed as an endpoint yet; phase 2E's ask endpoint will use it. See [ADR 004](docs/adr/004-hybrid-retrieval.md). |
+| Retrieval ([apps/backend/app/rag/retrieval.py](apps/backend/app/rag/retrieval.py)) | Hybrid search over active chunks: PostgreSQL full-text (English stemming, any-term match) and exact cosine vector search, fused with Reciprocal Rank Fusion. It has an optional service filter and a vector distance cap. An empty result means "no evidence". `POST /api/ask` uses it. See [ADR 004](docs/adr/004-hybrid-retrieval.md). |
+| Ask ([apps/backend/app/rag/answer.py](apps/backend/app/rag/answer.py)) | `POST /api/ask {"question": ..., "services": [...]}` returns:<br>- claims, each citing retrieved passages<br>- every retrieved passage<br>- limitations<br>- an `abstained` flag<br>Claims that cite passages not retrieved for this request are removed. With no evidence, it abstains without calling the model. The mock model only quotes sentences from the sources. See [ADR 005](docs/adr/005-grounded-answers-and-abstention.md). |
 | Evaluation ([datasets/evaluation](datasets/evaluation)) | Case schema, split rules, and 11 labeled development cases. No held-out test set yet. |
 | Frontend ([apps/frontend](apps/frontend)) | React page showing live backend readiness. |
 | CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) | Lint, type checks, tests (backend on pgvector), frontend build, secret scanning. |
@@ -164,7 +166,8 @@ docs/             Project plan, architecture, ADRs
 ## Current limitations
 
 - Embeddings are mock vectors only. Under mock, hybrid results come entirely from full-text search, and the vector channel matches only near-identical text. No retrieval-quality claims are made.
-- No question answering or model calls yet.
+- Answers come from a mock that quotes source sentences, not from a language model. It abstains often by design. Citations are checked to belong to the retrieved passages, not checked for entailment.
+- No real model calls yet.
 - Only Markdown is ingested. PDF and other formats are rejected with an explicit error.
 - No authentication. The API is bound to `127.0.0.1` and meant for local use only.
 - No investigation workflow, tools, jobs, or worker process.
@@ -175,7 +178,7 @@ docs/             Project plan, architecture, ADRs
 
 - [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md): eight-week plan (see its 2026-11-17 revision note)
 - [docs/architecture.md](docs/architecture.md): implemented local architecture vs. target
-- [docs/adr/](docs/adr/): architecture decision records (003: chunk storage, embedding dimension, accepted formats; 004: hybrid retrieval)
+- [docs/adr/](docs/adr/): architecture decision records (003: chunk storage, embedding dimension, accepted formats; 004: hybrid retrieval; 005: grounded answers and abstention)
 - [datasets/corpus/README.md](datasets/corpus/README.md): corpus sources and attribution
 
 ## License

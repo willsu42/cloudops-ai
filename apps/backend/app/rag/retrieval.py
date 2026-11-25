@@ -44,6 +44,14 @@ class RetrievalError(Exception):
     """Retrieval cannot run as requested; the message is safe to show."""
 
 
+class InvalidQuery(RetrievalError):
+    """The request itself is invalid (empty, too long, unknown service, ...)."""
+
+
+class IndexMismatch(RetrievalError):
+    """The stored index cannot serve this query (e.g. another embedding model)."""
+
+
 @dataclass(frozen=True)
 class RetrievedChunk:
     chunk_id: uuid.UUID
@@ -62,11 +70,11 @@ class RetrievedChunk:
 def _validate(query: str, top_k: int) -> str:
     query = query.strip()
     if not query:
-        raise RetrievalError("query is empty")
+        raise InvalidQuery("query is empty")
     if len(query) > MAX_QUERY_CHARS:
-        raise RetrievalError(f"query is longer than {MAX_QUERY_CHARS} characters")
+        raise InvalidQuery(f"query is longer than {MAX_QUERY_CHARS} characters")
     if top_k < 1:
-        raise RetrievalError("top_k must be at least 1")
+        raise InvalidQuery("top_k must be at least 1")
     return query
 
 
@@ -75,7 +83,7 @@ async def _check_services(engine: AsyncEngine, services: Sequence[str]) -> None:
         known = set(await conn.scalars(select(Service.slug).where(Service.slug.in_(services))))
     unknown = sorted(set(services) - known)
     if unknown:
-        raise RetrievalError(f"unknown service(s): {', '.join(unknown)}")
+        raise InvalidQuery(f"unknown service(s): {', '.join(unknown)}")
 
 
 async def _active_models(engine: AsyncEngine) -> set[str]:
@@ -151,7 +159,7 @@ async def vector_search(
         return []  # nothing ingested yet: no evidence
     if models != {provider.model_id}:
         # Vectors from different models are not comparable.
-        raise RetrievalError(
+        raise IndexMismatch(
             f"index uses embedding model(s) {sorted(models)}, but queries use "
             f"{provider.model_id!r}; re-run ingestion with the query model"
         )
@@ -232,7 +240,7 @@ async def retrieve(
 ) -> list[RetrievedChunk]:
     """Hybrid retrieval: each channel returns ``candidates`` chunks, fused to ``top_k``."""
     if candidates < top_k:
-        raise RetrievalError("candidates must be at least top_k")
+        raise InvalidQuery("candidates must be at least top_k")
     vector = await vector_search(
         engine, provider, query, top_k=candidates, max_distance=max_distance, services=services
     )
