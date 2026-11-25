@@ -75,3 +75,12 @@ async def test_request_id_is_echoed_or_generated(make_client: ClientFactory) -> 
     assert echoed.headers["X-Request-ID"] == "abc-123"
     generated = await client.get("/health/live", headers={"X-Request-ID": "bad id\n"})
     assert generated.headers["X-Request-ID"] not in ("", "bad id\n")
+
+
+async def test_source_lookup_with_database_down_is_a_safe_503(make_client: ClientFactory) -> None:
+    client = await make_client(
+        make_settings(_url(_closed_port()), db_connect_timeout_seconds=TIMEOUT)
+    )
+    response = await client.get("/api/sources/00000000-0000-0000-0000-000000000000")
+    assert response.status_code == 503
+    assert response.json() == {"detail": "database unavailable"}

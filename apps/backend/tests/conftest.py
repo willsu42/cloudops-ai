@@ -18,11 +18,15 @@ from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.core.config import REPO_ROOT, Settings, load_settings
+from app.ingest import ingest
 from app.main import create_app
+from app.providers.embeddings import MockEmbeddingProvider
+from app.seed import seed
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 DATASETS_DIR = REPO_ROOT / "datasets"
@@ -69,6 +73,25 @@ async def db_engine(migrated_database: str) -> AsyncIterator[AsyncEngine]:
     engine = create_async_engine(migrated_database)
     yield engine
     await engine.dispose()
+
+
+@pytest.fixture
+async def seeded(db_engine: AsyncEngine) -> AsyncEngine:
+    """Empty every table, then seed services and document metadata."""
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            text("TRUNCATE services, documents, document_versions, ingestion_runs CASCADE")
+        )
+    await seed(db_engine, DATASETS_DIR)
+    return db_engine
+
+
+@pytest.fixture
+async def ingested(seeded: AsyncEngine) -> AsyncEngine:
+    """Seeded database with every corpus document ingested by the mock provider."""
+    report = await ingest(seeded, DATASETS_DIR, MockEmbeddingProvider())
+    assert report.status == "succeeded"
+    return seeded
 
 
 ClientFactory = Callable[[Settings], Awaitable[AsyncClient]]

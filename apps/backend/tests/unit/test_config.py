@@ -45,3 +45,17 @@ def test_app_startup_fails_on_invalid_environment(monkeypatch: pytest.MonkeyPatc
 def test_defaults_are_mock_mode() -> None:
     settings = load_settings(_env_file=None, database_url=VALID_URL)
     assert settings.provider_mode == "mock"
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "name"),
+    [
+        ("retrieval_top_k", 0, "RETRIEVAL_TOP_K"),
+        ("retrieval_top_k", 51, "RETRIEVAL_TOP_K"),
+        ("retrieval_max_distance", 0, "RETRIEVAL_MAX_DISTANCE"),
+        ("retrieval_max_distance", 2.5, "RETRIEVAL_MAX_DISTANCE"),
+    ],
+)
+def test_retrieval_settings_are_bounded(field: str, value: float, name: str) -> None:
+    with pytest.raises(ConfigError, match=name):
+        load_settings(_env_file=None, database_url=VALID_URL, **{field: value})

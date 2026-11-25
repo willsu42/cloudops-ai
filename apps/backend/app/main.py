@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import health
+from app.api import health, sources
 from app.core.config import Settings, load_settings
 from app.core.logging import RequestContextMiddleware, configure_logging
 from app.db import create_engine
@@ -31,4 +31,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.add_middleware(RequestContextMiddleware)
     app.include_router(health.router)
+    app.include_router(sources.router)
     return app

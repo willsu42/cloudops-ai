@@ -16,7 +16,7 @@ from app.db.models import EMBEDDING_DIM
 from app.ingest import IngestReport, ingest
 from app.providers.embeddings import EmbeddingError, MockEmbeddingProvider
 from app.rag.chunking import chunk_markdown
-from app.seed import load_manifest, seed
+from app.seed import load_manifest
 from tests.conftest import DATASETS_DIR
 
 pytestmark = pytest.mark.db
@@ -48,16 +48,6 @@ class ShortVectorProvider(MockEmbeddingProvider):
 
     async def embed(self, texts: Sequence[str]) -> list[list[float]]:
         return [v[:-1] for v in await super().embed(texts)]
-
-
-@pytest.fixture
-async def seeded(db_engine: AsyncEngine) -> AsyncEngine:
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            text("TRUNCATE services, documents, document_versions, ingestion_runs CASCADE")
-        )
-    await seed(db_engine, DATASETS_DIR)
-    return db_engine
 
 
 async def _rows(engine: AsyncEngine, sql: str) -> list[dict[str, Any]]:

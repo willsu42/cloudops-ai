@@ -4,10 +4,11 @@ An evidence-grounded incident investigation assistant, under construction. The r
 system is the [OpenTelemetry Demo](https://opentelemetry.io/docs/demo/), starting
 with its checkout flow.
 
-> **Status: Week 1 foundation, plus Week 2 phases 2A–2C.** This repository currently contains a local
+> **Status: Week 1 foundation, plus Week 2 phases 2A–2D.** This repository currently contains a local
 > application skeleton (API health checks, database schema, seed data, a status
 > page), a document corpus, and an ingestion pipeline that stores chunks with
-> **mock** embeddings. It does **not** yet retrieve, answer questions,
+> **mock** embeddings, exact vector retrieval, and a source lookup API. It does
+> **not** yet answer questions,
 > investigate incidents, call a real model, or deploy to AWS. See
 > [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for the roadmap.
 
@@ -15,12 +16,13 @@ with its checkout flow.
 
 | Part | Description |
 | --- | --- |
-| API ([apps/backend](apps/backend)) | FastAPI with `GET /health/live` and `GET /health/ready`. Readiness checks PostgreSQL and the `vector` extension under a short deadline. |
+| API ([apps/backend](apps/backend)) | FastAPI with `GET /health/live`, `GET /health/ready`, and `GET /api/sources/{chunk_id}`. Readiness checks PostgreSQL and the `vector` extension under a short deadline. The source endpoint returns a stored chunk's text, heading path, line range, and document version. It returns 404 unless the chunk is in an active set. |
 | Database | PostgreSQL 17 + pgvector, migrated with Alembic. Tables: `services`, `documents`, `document_versions`, plus `ingestion_runs`, `chunk_sets`, `document_chunks` (`vector(1024)`). |
 | Corpus ([datasets/corpus](datasets/corpus)) | 12 OpenTelemetry Demo documentation pages (architecture, Docker deployment, the checkout path from frontend through quote and Kafka), copied unmodified with provenance. |
 | Seed | `python -m app.seed` loads services and document metadata. Safe to repeat. |
 | Parsing and chunking ([apps/backend/app/rag](apps/backend/app/rag)) | Pure functions (phase 2B). They turn corpus Markdown into heading-aware chunks with line ranges. |
 | Ingestion ([apps/backend/app/ingest.py](apps/backend/app/ingest.py)) | `python -m app.ingest` chunks and embeds every corpus document and stores 104 chunks. Repeat runs skip unchanged documents. A failed run keeps the previous chunks active. Only Markdown is accepted. Embeddings come from a deterministic **mock** with no semantic meaning. See [ADR 003](docs/adr/003-chunk-storage-and-embeddings.md). |
+| Retrieval ([apps/backend/app/rag/retrieval.py](apps/backend/app/rag/retrieval.py)) | Exact cosine search over active chunks, with an optional service filter and a distance cap. An empty result means "no evidence". It is not exposed as an endpoint yet; phase 2E's ask endpoint will use it. |
 | Evaluation ([datasets/evaluation](datasets/evaluation)) | Case schema, split rules, and 11 labeled development cases. No held-out test set yet. |
 | Frontend ([apps/frontend](apps/frontend)) | React page showing live backend readiness. |
 | CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) | Lint, type checks, tests (backend on pgvector), frontend build, secret scanning. |
@@ -96,6 +98,8 @@ The API container itself also reads these (set in
 | `DB_CONNECT_TIMEOUT_SECONDS` | `2.0` | Deadline for opening a DB connection. |
 | `READINESS_TIMEOUT_SECONDS` | `3.0` | Overall deadline for `/health/ready`. |
 | `DATASETS_DIR` | `<repo>/datasets` | `/srv/datasets` in the container (read-only mount). |
+| `RETRIEVAL_TOP_K` | `5` | Maximum chunks returned per query (1–50). Not set in Compose; the default applies. |
+| `RETRIEVAL_MAX_DISTANCE` | `0.8` | Cosine-distance cap (0–2). Chunks farther than this do not count as evidence. Not set in Compose; the default applies. To be tuned with a real embedding model. |
 
 **Database addresses.** Inside Compose the database is `db:5432`. From your
 machine the same database is `127.0.0.1:5433`
@@ -158,7 +162,8 @@ docs/             Project plan, architecture, ADRs
 
 ## Current limitations
 
-- Embeddings are mock vectors only, so nothing yet measures retrieval quality. No retrieval, question answering, or model calls yet.
+- Embeddings are mock vectors only, so nothing yet measures retrieval quality. With mock vectors, only text nearly identical to a stored chunk falls under the distance cap. Natural-language questions retrieve nothing.
+- No question answering or model calls yet.
 - Only Markdown is ingested. PDF and other formats are rejected with an explicit error.
 - No authentication. The API is bound to `127.0.0.1` and meant for local use only.
 - No investigation workflow, tools, jobs, or worker process.

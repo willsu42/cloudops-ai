@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     db_connect_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
     readiness_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
     datasets_dir: Path = REPO_ROOT / "datasets"
+    # Retrieval (phase 2D). Cosine distance ranges from 0 (same direction) to 2.
+    # Chunks farther than the cap are not evidence; if none are left, retrieval is
+    # empty and callers must abstain. Tune with a real embedding model: mock
+    # vectors have no meaning, so only near-identical text falls under the cap.
+    retrieval_top_k: int = Field(default=5, ge=1, le=50)
+    retrieval_max_distance: float = Field(default=0.8, gt=0, le=2)
 
     @field_validator("database_url")
     @classmethod

@@ -1,6 +1,6 @@
-# Handoff: Week 2 (2A–2C done, 2D next)
+# Handoff: Week 2 (2A–2D done, 2E next)
 
-> For whoever picks this up next, person or Claude. Continue 2D–2H from this
+> For whoever picks this up next, person or Claude. Continue 2E–2H from this
 > file, and delete it once Week 2 is complete.
 > The original phase design is in
 > `/Users/willsu/.claude/plans/based-on-this-plan-wiggly-simon.md`. That file
@@ -28,7 +28,8 @@
     `app/rag/chunking.py`. The chunker version is `md-heading-v1`.
   - **Correction:** the earlier "105 chunks" was an outdated figure. Under the
     current rules, the 12 documents produce **104 chunks**.
-- **2C, ingestion pipeline and schema:** done, **not committed yet**.
+- **2C, ingestion pipeline and schema:** pushed as `ef73991`. CI run
+  45419915660 passed every job.
   - The user confirmed two decisions on 2026-11-24:
     - The vector dimension is **1024**.
     - PDF is **rejected explicitly** and not parsed.
@@ -85,33 +86,72 @@
 | Compose: `make up`, `make seed`, then `make ingest` twice | First run: 12 documents ingested, 104 chunks. Second run: all 12 skipped. `format_type` = `vector(1024)`, 12 active sets |
 | Migration 0002 downgrade, then upgrade | Works |
 
-GitHub CI has not run yet; it runs after a push.
+### 2D Retrieval and source API: done, not committed yet
+
+- `app/rag/retrieval.py`: `retrieve(engine, provider, query, *, top_k,
+  max_distance, services=None) -> list[RetrievedChunk]`.
+  - Exact cosine distance (`<=>`, through pgvector's `cosine_distance`). The
+    active-set, embedding-model, service, and distance filters are all in the
+    same query that ranks, so filtering never shrinks the top k.
+  - Ties are broken by chunk ID, so results are deterministic.
+  - `RetrievalError` covers these cases:
+    - Empty query, or longer than 2000 characters.
+    - `top_k < 1`.
+    - Unknown service.
+    - Query provider's `model_id` differs from the active sets'
+      `embedding_model`.
+  - No ingested chunks returns `[]`, which means no evidence.
+- `GET /api/sources/{chunk_id}` (`app/api/sources.py`):
+  - Returns chunk text, heading_path, line range, chunker_version,
+    embedding_model, the document (source_key, title, kind, service,
+    source_url), and the version (repository, revision, source_file_url,
+    content_sha256, retrieved_on, license, attribution).
+  - Returns 404 `{"detail": "source not found"}` for unknown or inactive
+    chunks, and 422 for an ID that isn't a UUID.
+  - Database failures return 503 `{"detail": "database unavailable"}` with no
+    connection details.
+- New settings, both bounded:
+  - `RETRIEVAL_TOP_K`: default 5, range 1–50.
+  - `RETRIEVAL_MAX_DISTANCE`: default 0.8, range up to 2.
+- Tests:
+  - New `tests/integration/test_retrieval.py`: exact-text ranking, distance
+    cap, filtering before ranking, active-only, model mismatch, empty index,
+    invalid input, source API 200/404/422.
+  - In `test_health_unavailable.py`: the source API returns 503 when the
+    database is down.
+  - In `test_config.py`: the bounds on the new settings.
+  - The `seeded` fixture moved into `tests/conftest.py`, and a new `ingested`
+    fixture was added there.
+- Local verification:
+  - 74 backend tests pass.
+  - ruff and mypy strict pass.
+  - In Compose, `/api/sources/<id>` returns the passage with its version, and
+    an unknown ID gives 404.
+
+#### Known gap: mock retrieval finds nothing for real questions
+
+Mock vectors have no meaning. Distinct texts sit at cosine distance about 1.0,
+so with the 0.8 cap, any natural-language question retrieves nothing. Only
+text nearly identical to a chunk matches.
+
+Consequences:
+
+- Under mock, 2E's ask will always abstain.
+- 2H's "run ≥10 questions with mock" would only exercise the abstain path.
+
+Options, which need a decision from the user before 2E:
+
+1. **Add PostgreSQL full-text (lexical) retrieval now.** ADR 001 already plans
+   hybrid retrieval with RRF. It is deterministic, free, and gives meaningful
+   matches without AWS.
+2. Accept abstain-only under mock until AWS is enabled.
+3. Use a test-only mock LLM path that feeds hand-picked chunks.
+
+**Recommendation: 1.**
 
 ## 3. Remaining phases
 
-Dependencies: 2D → 2E → 2F. 2G can happen any time after 2E. 2H comes last.
-
-### 2D Retrieval and source API
-
-- `app/rag/retrieval.py`:
-  - Exact cosine search with `<=>`, **over chunks in active `chunk_sets`
-    only**.
-  - Optional service filter: JOIN on `documents.service_slug`.
-  - Apply filters before ranking, then take the top k.
-  - Embed the query with the same provider. Check that its `model_id` matches
-    the active sets' `embedding_model`, and raise an error if not, because
-    vectors from different models can't be compared.
-  - Put the empty-retrieval threshold (a distance cap) in settings.
-- `GET /api/sources/{chunk_id}`:
-  - Returns text, heading_path, the line range, source_url, source_file_url,
-    and version details (source_revision, retrieved_on).
-  - Returns 404 when the chunk doesn't exist or isn't in an active set.
-- Tests:
-  - With the mock provider, querying with a chunk's own text should rank that
-    chunk first, since the vectors are identical.
-  - Filters take effect.
-  - Inactive chunks are never returned.
-  - The source API's 404.
+Dependencies: 2E → 2F. 2G can happen any time after 2E. 2H comes last.
 
 ### 2E Generation, citations, and abstention
 
@@ -157,6 +197,8 @@ Dependencies: 2D → 2E → 2F. 2G can happen any time after 2E. 2H comes last.
 
 - **AWS account and region:** not enabled yet. Enable before Week 3 at the
   latest, and request Bedrock model access.
+- **Retrieval under mock:** decide before 2E whether to add full-text
+  retrieval (see "Known gap" in section 2; option 1 is recommended).
 - The vector dimension (1024) and PDF handling (reject only) are **decided**;
   see ADR 003.
 
