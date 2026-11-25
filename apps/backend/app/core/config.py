@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     # vectors have no meaning, so only near-identical text falls under the cap.
     retrieval_top_k: int = Field(default=5, ge=1, le=50)
     retrieval_max_distance: float = Field(default=0.8, gt=0, le=2)
+    # Each channel (vector, lexical) returns this many candidates before fusion.
+    retrieval_candidates: int = Field(default=20, ge=1, le=200)
 
     @field_validator("database_url")
     @classmethod

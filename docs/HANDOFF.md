@@ -1,4 +1,4 @@
-# Handoff: Week 2 (2A–2D done, 2E next)
+# Handoff: Week 2 (2A–2D and hybrid retrieval done, 2E next)
 
 > For whoever picks this up next, person or Claude. Continue 2E–2H from this
 > file, and delete it once Week 2 is complete.
@@ -86,68 +86,61 @@
 | Compose: `make up`, `make seed`, then `make ingest` twice | First run: 12 documents ingested, 104 chunks. Second run: all 12 skipped. `format_type` = `vector(1024)`, 12 active sets |
 | Migration 0002 downgrade, then upgrade | Works |
 
-### 2D Retrieval and source API: done, not committed yet
+### 2D Retrieval and source API
 
-- `app/rag/retrieval.py`: `retrieve(engine, provider, query, *, top_k,
-  max_distance, services=None) -> list[RetrievedChunk]`.
-  - Exact cosine distance (`<=>`, through pgvector's `cosine_distance`). The
-    active-set, embedding-model, service, and distance filters are all in the
-    same query that ranks, so filtering never shrinks the top k.
-  - Ties are broken by chunk ID, so results are deterministic.
-  - `RetrievalError` covers these cases:
-    - Empty query, or longer than 2000 characters.
-    - `top_k < 1`.
-    - Unknown service.
-    - Query provider's `model_id` differs from the active sets'
-      `embedding_model`.
-  - No ingested chunks returns `[]`, which means no evidence.
+Pushed as `5a31e3f`. CI run 45535981832 passed every job.
+
 - `GET /api/sources/{chunk_id}` (`app/api/sources.py`):
-  - Returns chunk text, heading_path, line range, chunker_version,
-    embedding_model, the document (source_key, title, kind, service,
-    source_url), and the version (repository, revision, source_file_url,
-    content_sha256, retrieved_on, license, attribution).
-  - Returns 404 `{"detail": "source not found"}` for unknown or inactive
-    chunks, and 422 for an ID that isn't a UUID.
-  - Database failures return 503 `{"detail": "database unavailable"}` with no
+  - Returns chunk text, heading_path, line range, chunker and embedding
+    versions, the document, and the version provenance.
+  - 404 `{"detail": "source not found"}` for unknown or inactive chunks; 422
+    for a non-UUID; 503 `{"detail": "database unavailable"}` with no
     connection details.
-- New settings, both bounded:
-  - `RETRIEVAL_TOP_K`: default 5, range 1–50.
-  - `RETRIEVAL_MAX_DISTANCE`: default 0.8, range up to 2.
-- Tests:
-  - New `tests/integration/test_retrieval.py`: exact-text ranking, distance
-    cap, filtering before ranking, active-only, model mismatch, empty index,
-    invalid input, source API 200/404/422.
-  - In `test_health_unavailable.py`: the source API returns 503 when the
-    database is down.
-  - In `test_config.py`: the bounds on the new settings.
-  - The `seeded` fixture moved into `tests/conftest.py`, and a new `ingested`
-    fixture was added there.
-- Local verification:
-  - 74 backend tests pass.
-  - ruff and mypy strict pass.
-  - In Compose, `/api/sources/<id>` returns the passage with its version, and
-    an unknown ID gives 404.
+- Settings: `RETRIEVAL_TOP_K` (5) and `RETRIEVAL_MAX_DISTANCE` (0.8).
+- The `seeded` and `ingested` fixtures live in `tests/conftest.py`.
 
-#### Known gap: mock retrieval finds nothing for real questions
+### Hybrid retrieval (ADR 004): done, not committed yet
 
-Mock vectors have no meaning. Distinct texts sit at cosine distance about 1.0,
-so with the 0.8 cap, any natural-language question retrieves nothing. Only
-text nearly identical to a chunk matches.
+Under mock vectors, natural-language questions retrieved nothing, so the user
+chose (2026-11-25) to add PostgreSQL full-text search now, as ADR 001 had
+planned.
 
-Consequences:
-
-- Under mock, 2E's ask will always abstain.
-- 2H's "run ≥10 questions with mock" would only exercise the abstain path.
-
-Options, which need a decision from the user before 2E:
-
-1. **Add PostgreSQL full-text (lexical) retrieval now.** ADR 001 already plans
-   hybrid retrieval with RRF. It is deterministic, free, and gives meaningful
-   matches without AWS.
-2. Accept abstain-only under mock until AWS is enabled.
-3. Use a test-only mock LLM path that feeds hand-picked chunks.
-
-**Recommendation: 1.**
+- **Migration `0003_chunk_fulltext.py`:** adds `document_chunks.search_vector`,
+  `GENERATED ALWAYS AS (to_tsvector('english'::regconfig, text)) STORED`, with
+  a GIN index. Ingestion is unchanged, and existing rows are backfilled.
+- **`app/rag/retrieval.py`:**
+  - `vector_search(...)`: the 2D vector channel. `score` is the cosine
+    distance.
+  - `lexical_search(engine, query, *, top_k, services=None)`:
+    - Uses `plainto_tsquery`, so user input can't inject operators.
+    - Rewrites `&` to `|`, so a chunk matches if it has any term.
+    - Ranks with `ts_rank(..., 1)`; ties break by chunk ID.
+  - `fuse(channels, *, top_k)`: RRF with k = 60. Keeps `vector_distance` and
+    `lexical_score` on each result.
+  - `retrieve(engine, provider, query, *, top_k, max_distance, candidates,
+    services=None)`: both channels, `candidates` each, fused to `top_k`.
+- **Setting:** `RETRIEVAL_CANDIDATES`, default 20, range 1–200.
+- **Tests:**
+  - `tests/unit/test_fusion.py`.
+  - In `tests/integration/test_retrieval.py`:
+    - The generated column is filled for every chunk.
+    - Stemmed any-term match.
+    - Operators and stop words in input are harmless.
+    - Service and active-set filters.
+    - A chunk found by both channels ranks first.
+    - Lexical fallback when vectors find nothing.
+    - Hybrid finds nothing when no term matches.
+    - The `candidates` vs `top_k` check.
+- **Local verification:** 87 backend tests pass; ruff and mypy strict pass.
+  Migration 0003 downgrades and upgrades cleanly. In Compose it applied on top
+  of existing data.
+- **Ad-hoc dev check, not a quality claim:** a relevant document was in the
+  hybrid top 5 for 7 of the 9 answerable dev cases. Both misses expect
+  `architecture.md`, whose large diagram chunk ranks low.
+- **Important for 2E:** both `insufficient_evidence` dev cases still return
+  candidates, since in-domain words match. Retrieval being non-empty is
+  **not** enough to answer. 2E must abstain when the cited chunks don't
+  support a claim, and mock behavior must not fake support.
 
 ## 3. Remaining phases
 
@@ -197,8 +190,10 @@ Dependencies: 2E → 2F. 2G can happen any time after 2E. 2H comes last.
 
 - **AWS account and region:** not enabled yet. Enable before Week 3 at the
   latest, and request Bedrock model access.
-- **Retrieval under mock:** decide before 2E whether to add full-text
-  retrieval (see "Known gap" in section 2; option 1 is recommended).
+- **Mock LLM behavior for 2E:** design it so it cannot fake evidence. For
+  example, build claims only from sentences quoted from retrieved chunks, and
+  abstain when no chunk overlaps the question enough. The rule should be
+  recorded in an ADR.
 - The vector dimension (1024) and PDF handling (reject only) are **decided**;
   see ADR 003.
 

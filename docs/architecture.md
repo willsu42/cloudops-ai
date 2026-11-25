@@ -50,7 +50,7 @@ erDiagram
     document_versions { uuid id PK; uuid document_id FK; string source_revision; string content_sha256; text application_reference; string license; date retrieved_on }
     ingestion_runs { uuid id PK; string status; string chunker_version; string embedding_model; int chunks_written; text error }
     chunk_sets { uuid id PK; uuid document_id FK; uuid document_version_id FK; string chunker_version; string embedding_model; int embedding_dim; bool is_active }
-    document_chunks { uuid id PK; uuid chunk_set_id FK; int index; text text; text_array heading_path; int start_line; int end_line; vector_1024 embedding }
+    document_chunks { uuid id PK; uuid chunk_set_id FK; int index; text text; text_array heading_path; int start_line; int end_line; vector_1024 embedding; tsvector search_vector }
 ```
 
 - A document's identity is its logical source (`source_key`). Each retrieved
@@ -72,6 +72,9 @@ erDiagram
   [ADR 003](adr/003-chunk-storage-and-embeddings.md).
 - Embeddings currently come from a deterministic mock provider. They have no
   semantic meaning.
+- `document_chunks.search_vector` is a generated `tsvector` (English) with a
+  GIN index (migration `0003`). Retrieval fuses full-text and vector rankings
+  with Reciprocal Rank Fusion; see [ADR 004](adr/004-hybrid-retrieval.md).
 
 ### Corpus and evaluation boundaries
 

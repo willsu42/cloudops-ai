@@ -54,6 +54,8 @@ def test_defaults_are_mock_mode() -> None:
         ("retrieval_top_k", 51, "RETRIEVAL_TOP_K"),
         ("retrieval_max_distance", 0, "RETRIEVAL_MAX_DISTANCE"),
         ("retrieval_max_distance", 2.5, "RETRIEVAL_MAX_DISTANCE"),
+        ("retrieval_candidates", 0, "RETRIEVAL_CANDIDATES"),
+        ("retrieval_candidates", 201, "RETRIEVAL_CANDIDATES"),
     ],
 )
 def test_retrieval_settings_are_bounded(field: str, value: float, name: str) -> None:
